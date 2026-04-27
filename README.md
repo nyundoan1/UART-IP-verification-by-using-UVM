@@ -8,6 +8,8 @@ The goal is to ensure correct functionality, protocol compliance, and robustness
 ##  Basic Specification
 
 The UART IP includes the following main features:
+<img width="710" height="402" alt="image" src="https://github.com/user-attachments/assets/84b2ee15-f601-43c8-b241-0fa6feb20d01" />
+
 
 - **AHB-Lite Interface**
   - Supports register read/write access
