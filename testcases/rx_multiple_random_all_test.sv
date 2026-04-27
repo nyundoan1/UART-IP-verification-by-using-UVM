@@ -1,0 +1,75 @@
+class rx_multiple_random_all_test extends uart_base_test;
+     `uvm_component_utils(rx_multiple_random_all_test)
+
+     uart_configuration uart_config;
+     uart_data_sequence uart_data_seq;
+
+     function new(string name = "rx_multiple_random_all_test", uvm_component parent);
+          super.new(name, parent);
+     endfunction
+
+     virtual function void build_phase (uvm_phase phase);
+          super.build_phase(phase);
+
+          uart_config = uart_configuration::type_id::create("uart_config");
+
+          uart_config.randomize() with { direction_mode == uart_configuration::REV;};
+
+          `uvm_info(get_type_name(), $sformatf("Baud rate in uart configuration: %d", uart_config.sprint()), UVM_LOW)
+          uvm_config_db#(uart_configuration)::set(this, "uart_env", "uart_config", uart_config);
+     endfunction: build_phase
+
+     virtual task run_phase(uvm_phase phase);
+          bit [31:0] division;
+          bit [31:0] rdata;
+          bit        osm_sel;
+          bit set_stop;
+          bit [1:0] set_dataframe;
+          uvm_status_e status;
+          osm_sel = $random;
+          if (osm_sel)
+               division = 100*10**6/(uart_config.baud_rate*13);
+          else
+               division = 100*10**6/(uart_config.baud_rate*16);
+          case (uart_config.data_width)
+               4'd5: set_dataframe = 2'b00;
+               4'd6: set_dataframe = 2'b01;
+               4'd7: set_dataframe = 2'b10;
+               4'd8: set_dataframe = 2'b11;
+               default: set_dataframe = 2'b00;
+          endcase
+          case (uart_config.num_of_stop_bit)
+               2'd1: set_stop = 1'b0;
+               2'd2: set_stop = 1'b1;
+               default: set_stop = 1'b0;
+          endcase               
+
+          `uvm_info(get_type_name(), $sformatf("Division: %d. Baud rate: %d", division, uart_config.baud_rate), UVM_LOW)
+          phase.raise_objection(this);
+               regmodel.MDR.write(status, {31'h00, osm_sel});
+               regmodel.DLL.write(status, division[7:0]);
+               regmodel.DLH.write(status, division[15:8]);
+               if (uart_config.parity_mode == uart_configuration::NONE)
+                    regmodel.LCR.write(status, {26'b0, 1'b1, 1'b1, 1'b0, set_stop, set_dataframe});
+               else if (uart_config.parity_mode == uart_configuration::EVEN)
+                    regmodel.LCR.write(status, {26'b0, 1'b1, 1'b1, 1'b1, set_stop, set_dataframe});
+               else if (uart_config.parity_mode == uart_configuration::ODD)
+                    regmodel.LCR.write(status, {26'b0, 1'b1, 1'b0, 1'b1, set_stop, set_dataframe});
+               uart_data_seq = uart_data_sequence::type_id::create("uart_data_seq");
+               uart_data_seq.start(uart_env.uart_agt.uart_seq);
+               #3ms;
+               regmodel.RBR.read(status, rdata);
+
+               uart_data_seq.start(uart_env.uart_agt.uart_seq);
+               #3ms;
+               regmodel.RBR.read(status, rdata);
+
+               uart_data_seq.start(uart_env.uart_agt.uart_seq);
+               #3ms;
+               regmodel.RBR.read(status, rdata);
+          #10ms;
+          phase.drop_objection(this);
+     endtask:run_phase
+
+endclass: rx_multiple_random_all_test
+
